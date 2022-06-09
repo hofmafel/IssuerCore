@@ -65,13 +65,8 @@ namespace IssuerCore
         {
             domains = new List<string>();
             count = new SortedDictionary<string, int>();
-
-           
-
-
             var connectionTasks = new List<Task>();
-
-            
+     
             if(!loadDomains())
                 return;
 
@@ -138,7 +133,8 @@ namespace IssuerCore
             }
 
             //sanity check: domains loaded == domains tested
-            Debug.Assert(count["Domains Tested"] == domains.Count, "Domains Tested unequal domains loaded!");
+            Trace.Assert(count["Domains Tested"] == domains.Count, "Domains Tested unequal domains loaded!");
+
 
         }
         static void addToEntry(String name)
