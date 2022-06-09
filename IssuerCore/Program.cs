@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http;
 using System.Net.Security;
@@ -14,6 +16,7 @@ namespace IssuerCore
 {
     internal class Program
     {
+        private static Mutex mutex = new Mutex();
         static List<String> domains;
         static SortedDictionary<string, int> count;       
               
@@ -62,6 +65,9 @@ namespace IssuerCore
         {
             domains = new List<string>();
             count = new SortedDictionary<string, int>();
+
+           
+
 
             var connectionTasks = new List<Task>();
 
@@ -131,6 +137,23 @@ namespace IssuerCore
 
             }
 
+            //sanity check: domains loaded == domains tested
+            Debug.Assert(count["Domains Tested"] == domains.Count, "Domains Tested unequal domains loaded!");
+
+        }
+        static void addToEntry(String name)
+        {
+            mutex.WaitOne();
+            try
+            {
+                count.Add(name, 1);
+            }
+            catch (ArgumentException)
+            {
+                //Entry exists already
+                count[name] = count[name] + 1;
+            }
+            mutex.ReleaseMutex();
         }
 
         /**
@@ -143,8 +166,8 @@ namespace IssuerCore
             handler.ServerCertificateCustomValidationCallback = validateCertificate;
             HttpClient client = new HttpClient(handler);
 
-            count["Domains Tested"] = count["Domains Tested"] + 1;
-
+            
+            addToEntry("Domains Tested");
             try
             {
                 HttpResponseMessage response0 = await client.GetAsync("https://" + domain);
@@ -154,7 +177,8 @@ namespace IssuerCore
             }
             catch (HttpRequestException exception0)
             {
-                count["HTTP-Exceptions"] = count["HTTP-Exceptions"] + 1;
+                
+                addToEntry("HTTP-Exceptions");
 
             }
 
@@ -180,7 +204,8 @@ namespace IssuerCore
             //Certificate could not be verified or is invalid
             if(sslErrors != SslPolicyErrors.None)
             {
-                count["Certificate invalid"] = count["Certificate invalid"] + 1;
+                
+                addToEntry("Certificate invalid");
                 return false;
             }
             
@@ -202,17 +227,7 @@ namespace IssuerCore
                 Console.WriteLine("issuer = issuer.Substring(start, end - start);: Out of range.");
             }
 
-            //add issuer to statistics
-            try
-            {
-                count.Add(issuer, 1);
-            }
-            catch (ArgumentException)
-            {
-                //Entry exists already
-                count[issuer] = count[issuer] + 1;
-            }
-
+            addToEntry(issuer);
             return true;
         }
     }
